@@ -64,6 +64,7 @@ Ghost ghosts[3];
 
 int pCol = 0;
 int pRow = 0;
+bool playerMoved = false;
 int menuIdx = 0;
 int startLvl = 1;
 bool shouldExit = false;
@@ -365,10 +366,10 @@ void UpdateMenuScreens() {
         }
 
         if (IsKeyPressed(KEY_UP)) {
-            menuIdx = (menuIdx - 1 + 5) % 5;
+            menuIdx = (menuIdx - 1 + 4) % 4;
         }
         if (IsKeyPressed(KEY_DOWN)) {
-            menuIdx = (menuIdx + 1) % 5;
+            menuIdx = (menuIdx + 1) % 4;
         }
         
         Rectangle startBtn  = { 380, 245, 240, 35 };
@@ -376,8 +377,7 @@ void UpdateMenuScreens() {
         Rectangle levelBtn  = { 380, 305, 260, 35 };
         Rectangle rightArr  = { 650, 305, 30, 35 };
         Rectangle hsBtn     = { 380, 365, 240, 35 };
-        Rectangle fsBtn     = { 380, 425, 220, 35 };
-        Rectangle exitBtn   = { 380, 485, 220, 35 };
+        Rectangle exitBtn   = { 380, 415, 220, 35 };
 
         Vector2 mouse = GetMousePosition();
         float scale = fminf((float)GetScreenWidth() / 1000.0f, (float)GetScreenHeight() / 600.0f);
@@ -395,10 +395,8 @@ void UpdateMenuScreens() {
                 menuIdx = 1;
             } else if (CheckCollisionPointRec(mouse, hsBtn)) {
                 menuIdx = 2;
-            } else if (CheckCollisionPointRec(mouse, fsBtn)) {
-                menuIdx = 3;
             } else if (CheckCollisionPointRec(mouse, exitBtn)) {
-                menuIdx = 4;
+                menuIdx = 3;
             }
         }
 
@@ -417,12 +415,9 @@ void UpdateMenuScreens() {
             } else if (CheckCollisionPointRec(mouse, hsBtn)) { 
                 state = HIGHSCORES; 
                 menuIdx = 2; 
-            } else if (CheckCollisionPointRec(mouse, fsBtn)) { 
-                ToggleFullscreen(); 
-                menuIdx = 3; 
             } else if (CheckCollisionPointRec(mouse, exitBtn)) { 
                 shouldExit = true; 
-                menuIdx = 4; 
+                menuIdx = 3; 
             }
         }
 
@@ -441,8 +436,6 @@ void UpdateMenuScreens() {
             } else if (menuIdx == 2) {
                 state = HIGHSCORES;
             } else if (menuIdx == 3) {
-                ToggleFullscreen();
-            } else if (menuIdx == 4) {
                 shouldExit = true;
             }
         }
@@ -511,391 +504,436 @@ void UpdateGameEndStates() {
 }
 
 // Player input, movement, and bomb spawn/tick/explosion logic for the PLAYING state.
-void UpdatePlayerMovementAndBombs() {
-    if (state == PLAYING) {
-        if (IsKeyPressed(KEY_ESCAPE)) {
-            UpdateHighScores(score);
-            StopSound(bgm);
-            state = START;
-        }
-        if (!IsSoundPlaying(bgm)) {
-            PlaySound(bgm);
-        }
+// Handles the pause/quit shortcut and keeps the background music looping.
+void UpdatePlayerControlsAndAudio() {
+    if (IsKeyPressed(KEY_ESCAPE)) {
+        UpdateHighScores(score);
+        StopSound(bgm);
+        state = START;
+    }
+    if (!IsSoundPlaying(bgm)) {
+        PlaySound(bgm);
+    }
+}
 
-        if (shakeTime > 0.0f) {
-            shakeTime -= GetFrameTime();
+// Counts down the screen-shake/flash effect timers and advances particles.
+void UpdateParticleEffects() {
+    if (shakeTime > 0.0f) {
+        shakeTime -= GetFrameTime();
+    }
+    if (flashTime > 0.0f) {
+        flashTime -= GetFrameTime();
+    }
+
+    for (int i = 0; i < 128; ++i) {
+        if (particles[i].life > 0.0f) {
+            particles[i].x += particles[i].dx;
+            particles[i].y += particles[i].dy;
+            particles[i].life -= GetFrameTime();
         }
-        if (flashTime > 0.0f) {
-            flashTime -= GetFrameTime();
+    }
+}
+
+// Reads movement keys, applies collision-checked movement, and updates the
+// player's current grid cell (pCol/pRow) plus the shared playerMoved flag.
+void UpdatePlayerMovement() {
+    float spd = 3.5f * pSpdBooster;
+    float dx = 0.0f;
+    float dy = 0.0f;
+
+    if (IsKeyDown(KEY_UP)) dy = -spd;
+    if (IsKeyDown(KEY_DOWN)) dy = spd;
+    if (IsKeyDown(KEY_LEFT)) dx = -spd;
+    if (IsKeyDown(KEY_RIGHT)) dx = spd;
+
+    if (dx != 0.0f || dy != 0.0f) {
+        lastPlayerDx = dx > 0.0f ? 1.0f : (dx < 0.0f ? -1.0f : 0.0f);
+        lastPlayerDy = dy > 0.0f ? 1.0f : (dy < 0.0f ? -1.0f : 0.0f);
+    }
+
+    playerMoved = false;
+    if (dx != 0.0f) {
+        float nextX = pX + dx;
+        if (!checkCollision(nextX, pY, 12.0f)) {
+            pX = nextX;
+            playerMoved = true;
         }
-
-        for (int i = 0; i < 128; ++i) {
-            if (particles[i].life > 0.0f) {
-                particles[i].x += particles[i].dx;
-                particles[i].y += particles[i].dy;
-                particles[i].life -= GetFrameTime();
-            }
+    }
+    if (dy != 0.0f) {
+        float nextY = pY + dy;
+        if (!checkCollision(pX, nextY, 12.0f)) {
+            pY = nextY;
+            playerMoved = true;
         }
+    }
 
-        float spd = 3.5f * pSpdBooster;
-        float dx = 0.0f;
-        float dy = 0.0f;
+    pCol = (int)(pX / 40.0f);
+    pRow = (int)(pY / 40.0f);
+}
 
-        if (IsKeyDown(KEY_UP)) dy = -spd;
-        if (IsKeyDown(KEY_DOWN)) dy = spd;
-        if (IsKeyDown(KEY_LEFT)) dx = -spd;
-        if (IsKeyDown(KEY_RIGHT)) dx = spd;
+// While the player is moving, counts down the bomb spawn timer and, once it
+// elapses, tries to place up to 3 new bombs near the player.
+void UpdateBombSpawning() {
+    if (!playerMoved) return;
 
-        if (dx != 0.0f || dy != 0.0f) {
-            lastPlayerDx = dx > 0.0f ? 1.0f : (dx < 0.0f ? -1.0f : 0.0f);
-            lastPlayerDy = dy > 0.0f ? 1.0f : (dy < 0.0f ? -1.0f : 0.0f);
-        }
+    bombSpawnTimer -= GetFrameTime();
+    if (bombSpawnTimer > 0.0f) return;
 
-        bool playerMoved = false;
-        if (dx != 0.0f) {
-            float nextX = pX + dx;
-            if (!checkCollision(nextX, pY, 12.0f)) {
-                pX = nextX;
-                playerMoved = true;
-            }
-        }
-        if (dy != 0.0f) {
-            float nextY = pY + dy;
-            if (!checkCollision(pX, nextY, 12.0f)) {
-                pY = nextY;
-                playerMoved = true;
-            }
-        }
-
-        pCol = (int)(pX / 40.0f);
-        pRow = (int)(pY / 40.0f);
-
-        if (playerMoved) {
-            bombSpawnTimer -= GetFrameTime();
-            if (bombSpawnTimer <= 0.0f) {
-                bombSpawnTimer = 3.0f;
-                for (int bSpawn = 0; bSpawn < 3; ++bSpawn) {
-                    int r = 0, c = 0;
-                    bool valid = false;
-                    for (int attempts = 0; attempts < 30; ++attempts) {
-                        int dr = GetRandomValue(-4, 4);
-                        int dc = GetRandomValue(-4, 4);
-                        int dist = abs(dr) + abs(dc);
-                        if (dist >= 2 && dist <= 5) {
-                            int tr = pRow + dr;
-                            int tc = pCol + dc;
-                            if (tr >= 1 && tr < 14 && tc >= 1 && tc < 19) {
-                                if (currentMap[tr][tc] != 1 && currentMap[tr][tc] != 3) {
-                                    bool occupied = false;
-                                    for (int i = 0; i < 3; ++i) {
-                                        if (bombs[i].active && bombs[i].row == tr && bombs[i].col == tc) {
-                                            occupied = true;
-                                            break;
-                                        }
-                                    }
-                                    if (!occupied) {
-                                        r = tr;
-                                        c = tc;
-                                        valid = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if (valid) {
+    bombSpawnTimer = 3.0f;
+    for (int bSpawn = 0; bSpawn < 3; ++bSpawn) {
+        int r = 0, c = 0;
+        bool valid = false;
+        for (int attempts = 0; attempts < 30; ++attempts) {
+            int dr = GetRandomValue(-4, 4);
+            int dc = GetRandomValue(-4, 4);
+            int dist = abs(dr) + abs(dc);
+            if (dist >= 2 && dist <= 5) {
+                int tr = pRow + dr;
+                int tc = pCol + dc;
+                if (tr >= 1 && tr < 14 && tc >= 1 && tc < 19) {
+                    if (currentMap[tr][tc] != 1 && currentMap[tr][tc] != 3) {
+                        bool occupied = false;
                         for (int i = 0; i < 3; ++i) {
-                            if (!bombs[i].active) {
-                                bombs[i].row = r;
-                                bombs[i].col = c;
-                                bombs[i].timeLeft = (float)GetRandomValue(3, 6);
-                                bombs[i].active = true;
+                            if (bombs[i].active && bombs[i].row == tr && bombs[i].col == tc) {
+                                occupied = true;
                                 break;
                             }
+                        }
+                        if (!occupied) {
+                            r = tr;
+                            c = tc;
+                            valid = true;
+                            break;
                         }
                     }
                 }
             }
         }
-
-        for (int i = 0; i < 3; ++i) {
-            if (bombs[i].active) {
-                bombs[i].timeLeft -= GetFrameTime();
-                if (bombs[i].timeLeft <= 0.0f) {
-                    bombs[i].active = false;
-                    int spawned = 0;
-                    for (int p = 0; p < 128 && spawned < 10; ++p) {
-                        if (particles[p].life <= 0.0f) {
-                            particles[p].x = bombs[i].col * 40.0f + 20.0f;
-                            particles[p].y = bombs[i].row * 40.0f + 20.0f;
-                            particles[p].dx = (float)GetRandomValue(-150, 150) / 50.0f;
-                            particles[p].dy = (float)GetRandomValue(-150, 150) / 50.0f;
-                            particles[p].life = 0.4f;
-                            particles[p].maxLife = 0.4f;
-                            particles[p].color = ORANGE;
-                            spawned++;
-                        }
-                    }
-                } else {
-                    float bx = bombs[i].col * 40.0f + 20.0f;
-                    float by = bombs[i].row * 40.0f + 20.0f;
-                    float distSq = (pX - bx) * (pX - bx) + (pY - by) * (pY - by);
-                    if (distSq < 576.0f) {
-                        bombs[i].active = false;
-                        PlaySound(bombSnd);
-                        int spawned = 0;
-                        for (int p = 0; p < 128 && spawned < 20; ++p) {
-                            if (particles[p].life <= 0.0f) {
-                                particles[p].x = bx;
-                                particles[p].y = by;
-                                particles[p].dx = (float)GetRandomValue(-200, 200) / 40.0f;
-                                particles[p].dy = (float)GetRandomValue(-200, 200) / 40.0f;
-                                particles[p].life = 0.5f;
-                                particles[p].maxLife = 0.5f;
-                                particles[p].color = RED;
-                                spawned++;
-                            }
-                        }
-                        shakeTime = 0.4f;
-                        shakeIntensity = 8.0f;
-                        flashTime = 0.3f;
-                        lives--;
-                        if (lives <= 0) {
-                            UpdateHighScores(score);
-                            state = GAMEOVER;
-                        } else {
-                            pX = 1 * 40.0f + 20.0f;
-                            pY = 1 * 40.0f + 20.0f;
-                            lastPlayerDx = 0.0f;
-                            lastPlayerDy = 0.0f;
-                            ghosts[0].x = 18 * 40.0f + 20.0f;
-                            ghosts[0].y = 3 * 40.0f + 20.0f;
-                            ghosts[0].dx = 0.0f;
-                            ghosts[0].dy = 0.0f;
-                            ghosts[1].x = 3 * 40.0f + 20.0f;
-                            ghosts[1].y = 13 * 40.0f + 20.0f;
-                            ghosts[1].dx = 0.0f;
-                            ghosts[1].dy = 0.0f;
-                            ghosts[2].x = 17 * 40.0f + 20.0f;
-                            ghosts[2].y = 13 * 40.0f + 20.0f;
-                            ghosts[2].dx = 0.0f;
-                            ghosts[2].dy = 0.0f;
-                            for (int b = 0; b < 3; ++b) bombs[b].active = false;
-                        }
-                    }
+        if (valid) {
+            for (int i = 0; i < 3; ++i) {
+                if (!bombs[i].active) {
+                    bombs[i].row = r;
+                    bombs[i].col = c;
+                    bombs[i].timeLeft = (float)GetRandomValue(3, 6);
+                    bombs[i].active = true;
+                    break;
                 }
             }
         }
     }
 }
 
-// Ball pickup, exit-gate unlock, and ghost AI movement/collision for the PLAYING state.
+// Resets the player and ghosts back to their starting spots after a hit,
+// clearing any live bombs so the player gets a clean moment to recover.
+void RespawnPlayerAndGhosts() {
+    pX = 1 * 40.0f + 20.0f;
+    pY = 1 * 40.0f + 20.0f;
+    lastPlayerDx = 0.0f;
+    lastPlayerDy = 0.0f;
+    ghosts[0].x = 18 * 40.0f + 20.0f;
+    ghosts[0].y = 3 * 40.0f + 20.0f;
+    ghosts[0].dx = 0.0f;
+    ghosts[0].dy = 0.0f;
+    ghosts[1].x = 3 * 40.0f + 20.0f;
+    ghosts[1].y = 13 * 40.0f + 20.0f;
+    ghosts[1].dx = 0.0f;
+    ghosts[1].dy = 0.0f;
+    ghosts[2].x = 17 * 40.0f + 20.0f;
+    ghosts[2].y = 13 * 40.0f + 20.0f;
+    ghosts[2].dx = 0.0f;
+    ghosts[2].dy = 0.0f;
+    for (int b = 0; b < 3; ++b) bombs[b].active = false;
+}
+
+// Ticks each active bomb's fuse: auto-explodes it with a small particle burst
+// when the timer runs out, or explodes it early (with damage) if the player
+// gets too close.
+void UpdateActiveBombs() {
+    for (int i = 0; i < 3; ++i) {
+        if (!bombs[i].active) continue;
+
+        bombs[i].timeLeft -= GetFrameTime();
+        if (bombs[i].timeLeft <= 0.0f) {
+            bombs[i].active = false;
+            int spawned = 0;
+            for (int p = 0; p < 128 && spawned < 10; ++p) {
+                if (particles[p].life <= 0.0f) {
+                    particles[p].x = bombs[i].col * 40.0f + 20.0f;
+                    particles[p].y = bombs[i].row * 40.0f + 20.0f;
+                    particles[p].dx = (float)GetRandomValue(-150, 150) / 50.0f;
+                    particles[p].dy = (float)GetRandomValue(-150, 150) / 50.0f;
+                    particles[p].life = 0.4f;
+                    particles[p].maxLife = 0.4f;
+                    particles[p].color = ORANGE;
+                    spawned++;
+                }
+            }
+            continue;
+        }
+
+        float bx = bombs[i].col * 40.0f + 20.0f;
+        float by = bombs[i].row * 40.0f + 20.0f;
+        float distSq = (pX - bx) * (pX - bx) + (pY - by) * (pY - by);
+        if (distSq >= 576.0f) continue;
+
+        bombs[i].active = false;
+        PlaySound(bombSnd);
+        int spawned = 0;
+        for (int p = 0; p < 128 && spawned < 20; ++p) {
+            if (particles[p].life <= 0.0f) {
+                particles[p].x = bx;
+                particles[p].y = by;
+                particles[p].dx = (float)GetRandomValue(-200, 200) / 40.0f;
+                particles[p].dy = (float)GetRandomValue(-200, 200) / 40.0f;
+                particles[p].life = 0.5f;
+                particles[p].maxLife = 0.5f;
+                particles[p].color = RED;
+                spawned++;
+            }
+        }
+        shakeTime = 0.4f;
+        shakeIntensity = 8.0f;
+        flashTime = 0.3f;
+        lives--;
+        if (lives <= 0) {
+            UpdateHighScores(score);
+            state = GAMEOVER;
+        } else {
+            RespawnPlayerAndGhosts();
+        }
+    }
+}
+
+void UpdatePlayerMovementAndBombs() {
+    if (state == PLAYING) {
+        UpdatePlayerControlsAndAudio();
+        UpdateParticleEffects();
+        UpdatePlayerMovement();
+        UpdateBombSpawning();
+        UpdateActiveBombs();
+    }
+}
+
+// Collects the ball under the player's current cell, if any, awarding score,
+// spawning a small particle burst, and occasionally boosting player speed.
+void UpdateBallPickup() {
+    if (pRow < 0 || pRow >= 15 || pCol < 0 || pCol >= 20) return;
+    if (!balls[pRow][pCol]) return;
+
+    balls[pRow][pCol] = false;
+    score += 10;
+    totalBalls--;
+    ballsInLevelCollected++;
+    PlaySound(collectSnd);
+
+    int spawned = 0;
+    for (int i = 0; i < 128 && spawned < 10; ++i) {
+        if (particles[i].life <= 0.0f) {
+            particles[i].x = pCol * 40.0f + 20.0f;
+            particles[i].y = pRow * 40.0f + 20.0f;
+            particles[i].dx = (float)GetRandomValue(-150, 150) / 50.0f;
+            particles[i].dy = (float)GetRandomValue(-150, 150) / 50.0f;
+            particles[i].life = 0.4f;
+            particles[i].maxLife = 0.4f;
+            particles[i].color = SKYBLUE;
+            spawned++;
+        }
+    }
+
+    if (ballsInLevelCollected % 10 == 0) {
+        pSpdBooster += 0.1f;
+    }
+}
+
+// Unlocks the exit once all balls are collected, and advances to LEVELUP
+// once the player steps onto the exit cell.
+void UpdateExitGate() {
+    if (totalBalls <= 0) {
+        exitUnlocked = true;
+    }
+
+    if (pCol == exitCol && pRow == exitRow) {
+        state = LEVELUP;
+        levelUpTimer = 1.5f;
+    }
+}
+
+// Picks a new direction for ghost i once it reaches the center of its
+// current cell: gathers the walkable directions (preferring not to reverse),
+// then chases/ambushes/wanders depending on which ghost this is, while
+// avoiding directions that would collide with another ghost.
+void ChooseGhostDirection(int i, int gRow, int gCol, float centerX, float centerY) {
+    float dirs[4][2] = { {0, -1}, {0, 1}, {-1, 0}, {1, 0} };
+    std::vector<std::pair<float, float>> validDirs;
+
+    for (int d = 0; d < 4; ++d) {
+        int nr = gRow + (int)dirs[d][1];
+        int nc = gCol + (int)dirs[d][0];
+        if (nr >= 0 && nr < 15 && nc >= 0 && nc < 20) {
+            if (currentMap[nr][nc] != 1) {
+                if (dirs[d][0] * ghosts[i].dx + dirs[d][1] * ghosts[i].dy >= 0.0f || (ghosts[i].dx == 0.0f && ghosts[i].dy == 0.0f)) {
+                    validDirs.push_back({dirs[d][0], dirs[d][1]});
+                }
+            }
+        }
+    }
+
+    if (validDirs.empty()) {
+        for (int d = 0; d < 4; ++d) {
+            int nr = gRow + (int)dirs[d][1];
+            int nc = gCol + (int)dirs[d][0];
+            if (nr >= 0 && nr < 15 && nc >= 0 && nc < 20) {
+                if (currentMap[nr][nc] != 1) {
+                    validDirs.push_back({dirs[d][0], dirs[d][1]});
+                }
+            }
+        }
+    }
+
+    if (validDirs.empty()) return;
+
+    float targetX = pX;
+    float targetY = pY;
+
+    if (i == 0) {
+        targetX = pX;
+        targetY = pY;
+    } else if (i == 1) {
+        float lookAhead = 4 * 40.0f;
+        targetX = pX + lastPlayerDx * lookAhead;
+        targetY = pY + lastPlayerDy * lookAhead;
+    } else {
+        float distToPlayerSq = (pX - centerX) * (pX - centerX) + (pY - centerY) * (pY - centerY);
+        if (distToPlayerSq > (300.0f * 300.0f)) {
+            targetX = centerX + (float)GetRandomValue(-300, 300);
+            targetY = centerY + (float)GetRandomValue(-300, 300);
+        } else {
+            targetX = pX;
+            targetY = pY;
+        }
+    }
+
+    float bestDx = validDirs[0].first;
+    float bestDy = validDirs[0].second;
+    float bestDistSq = 1e9f;
+
+    bool wander = (GetRandomValue(0, 100) < 6);
+    if (wander) {
+        int rIdx = GetRandomValue(0, (int)validDirs.size() - 1);
+        bestDx = validDirs[rIdx].first;
+        bestDy = validDirs[rIdx].second;
+    } else {
+        bool allPenalized = true;
+        for (auto& vd : validDirs) {
+            float nextX = centerX + vd.first * 40.0f;
+            float nextY = centerY + vd.second * 40.0f;
+
+            float penalty = 0.0f;
+            for (int j = 0; j < 3; ++j) {
+                if (j == i) continue;
+                float ghostDistSq = (ghosts[j].x - nextX) * (ghosts[j].x - nextX)
+                                   + (ghosts[j].y - nextY) * (ghosts[j].y - nextY);
+                if (ghostDistSq < (30.0f * 30.0f)) {
+                    penalty = 100000.0f;
+                }
+            }
+            if (penalty == 0.0f) allPenalized = false;
+
+            float dSq = (targetX - nextX) * (targetX - nextX) + (targetY - nextY) * (targetY - nextY);
+            dSq += penalty;
+            if (dSq < bestDistSq) {
+                bestDistSq = dSq;
+                bestDx = vd.first;
+                bestDy = vd.second;
+            }
+        }
+
+        if (allPenalized) {
+            bestDistSq = 1e9f;
+            for (auto& vd : validDirs) {
+                float nextX = centerX + vd.first * 40.0f;
+                float nextY = centerY + vd.second * 40.0f;
+                float dSq = (targetX - nextX) * (targetX - nextX) + (targetY - nextY) * (targetY - nextY);
+                if (dSq < bestDistSq) {
+                    bestDistSq = dSq;
+                    bestDx = vd.first;
+                    bestDy = vd.second;
+                }
+            }
+        }
+    }
+
+    ghosts[i].dx = bestDx * ghostSpd;
+    ghosts[i].dy = bestDy * ghostSpd;
+}
+
+// Snaps ghost i to its cell center and re-picks a direction whenever it
+// reaches (or passes) that center point.
+void UpdateGhostDirectionIfAtCenter(int i) {
+    int gCol = (int)(ghosts[i].x / 40.0f);
+    int gRow = (int)(ghosts[i].y / 40.0f);
+    float centerX = gCol * 40.0f + 20.0f;
+    float centerY = gRow * 40.0f + 20.0f;
+
+    bool crossedCenter = false;
+    if (ghosts[i].dx > 0.0f && ghosts[i].x < centerX && ghosts[i].x + ghosts[i].dx >= centerX) crossedCenter = true;
+    else if (ghosts[i].dx < 0.0f && ghosts[i].x > centerX && ghosts[i].x + ghosts[i].dx <= centerX) crossedCenter = true;
+    else if (ghosts[i].dy > 0.0f && ghosts[i].y < centerY && ghosts[i].y + ghosts[i].dy >= centerY) crossedCenter = true;
+    else if (ghosts[i].dy < 0.0f && ghosts[i].y > centerY && ghosts[i].y + ghosts[i].dy <= centerY) crossedCenter = true;
+    else if (ghosts[i].dx == 0.0f && ghosts[i].dy == 0.0f) crossedCenter = true;
+
+    if (!crossedCenter) return;
+
+    ghosts[i].x = centerX;
+    ghosts[i].y = centerY;
+    ChooseGhostDirection(i, gRow, gCol, centerX, centerY);
+}
+
+// Checks whether ghost i is touching the player; if so, applies the hit
+// (life loss, screen shake/flash, and either game over or a respawn).
+// Returns true when a hit was handled, so the caller can stop processing
+// further ghosts for this frame.
+bool CheckGhostPlayerCollision(int i) {
+    float distSq = (pX - ghosts[i].x) * (pX - ghosts[i].x) + (pY - ghosts[i].y) * (pY - ghosts[i].y);
+    if (distSq >= 576.0f) return false;
+
+    PlaySound(ghostSnd);
+    shakeTime = 0.4f;
+    shakeIntensity = 6.0f;
+    flashTime = 0.3f;
+    lives--;
+    if (lives <= 0) {
+        UpdateHighScores(score);
+        state = GAMEOVER;
+    } else {
+        RespawnPlayerAndGhosts();
+    }
+    return true;
+}
+
+// Advances all 3 ghosts for one frame: re-aims them at cell centers, moves
+// them, and checks for a collision with the player (stopping at the first
+// one found, matching the original single-hit-per-frame behavior).
+void UpdateGhosts() {
+    for (int i = 0; i < 3; ++i) {
+        UpdateGhostDirectionIfAtCenter(i);
+
+        ghosts[i].x += ghosts[i].dx;
+        ghosts[i].y += ghosts[i].dy;
+
+        if (CheckGhostPlayerCollision(i)) break;
+    }
+}
+
 void UpdateBallsGhostsCollisions() {
     if (state == PLAYING) {
-        if (pRow >= 0 && pRow < 15 && pCol >= 0 && pCol < 20) {
-            if (balls[pRow][pCol]) {
-                balls[pRow][pCol] = false;
-                score += 10;
-                totalBalls--;
-                ballsInLevelCollected++;
-                PlaySound(collectSnd);
-
-                int spawned = 0;
-                for (int i = 0; i < 128 && spawned < 10; ++i) {
-                    if (particles[i].life <= 0.0f) {
-                        particles[i].x = pCol * 40.0f + 20.0f;
-                        particles[i].y = pRow * 40.0f + 20.0f;
-                        particles[i].dx = (float)GetRandomValue(-150, 150) / 50.0f;
-                        particles[i].dy = (float)GetRandomValue(-150, 150) / 50.0f;
-                        particles[i].life = 0.4f;
-                        particles[i].maxLife = 0.4f;
-                        particles[i].color = SKYBLUE;
-                        spawned++;
-                    }
-                }
-
-                if (ballsInLevelCollected % 10 == 0) {
-                    pSpdBooster += 0.1f;
-                }
-            }
-        }
-
-        if (totalBalls <= 0) {
-            exitUnlocked = true;
-        }
-
-        if (pCol == exitCol && pRow == exitRow) {
-            state = LEVELUP;
-            levelUpTimer = 1.5f;
-        }
-
-        for (int i = 0; i < 3; ++i) {
-            int gCol = (int)(ghosts[i].x / 40.0f);
-            int gRow = (int)(ghosts[i].y / 40.0f);
-            float centerX = gCol * 40.0f + 20.0f;
-            float centerY = gRow * 40.0f + 20.0f;
-
-            bool crossedCenter = false;
-            if (ghosts[i].dx > 0.0f && ghosts[i].x < centerX && ghosts[i].x + ghosts[i].dx >= centerX) crossedCenter = true;
-            else if (ghosts[i].dx < 0.0f && ghosts[i].x > centerX && ghosts[i].x + ghosts[i].dx <= centerX) crossedCenter = true;
-            else if (ghosts[i].dy > 0.0f && ghosts[i].y < centerY && ghosts[i].y + ghosts[i].dy >= centerY) crossedCenter = true;
-            else if (ghosts[i].dy < 0.0f && ghosts[i].y > centerY && ghosts[i].y + ghosts[i].dy <= centerY) crossedCenter = true;
-            else if (ghosts[i].dx == 0.0f && ghosts[i].dy == 0.0f) crossedCenter = true;
-
-            if (crossedCenter) {
-                ghosts[i].x = centerX;
-                ghosts[i].y = centerY;
-
-                float dirs[4][2] = { {0, -1}, {0, 1}, {-1, 0}, {1, 0} };
-                std::vector<std::pair<float, float>> validDirs;
-
-                for (int d = 0; d < 4; ++d) {
-                    int nr = gRow + (int)dirs[d][1];
-                    int nc = gCol + (int)dirs[d][0];
-                    if (nr >= 0 && nr < 15 && nc >= 0 && nc < 20) {
-                        if (currentMap[nr][nc] != 1) {
-                            if (dirs[d][0] * ghosts[i].dx + dirs[d][1] * ghosts[i].dy >= 0.0f || (ghosts[i].dx == 0.0f && ghosts[i].dy == 0.0f)) {
-                                validDirs.push_back({dirs[d][0], dirs[d][1]});
-                            }
-                        }
-                    }
-                }
-
-                if (validDirs.empty()) {
-                    for (int d = 0; d < 4; ++d) {
-                        int nr = gRow + (int)dirs[d][1];
-                        int nc = gCol + (int)dirs[d][0];
-                        if (nr >= 0 && nr < 15 && nc >= 0 && nc < 20) {
-                            if (currentMap[nr][nc] != 1) {
-                                validDirs.push_back({dirs[d][0], dirs[d][1]});
-                            }
-                        }
-                    }
-                }
-
-                if (!validDirs.empty()) {
-                    float targetX = pX;
-                    float targetY = pY;
-
-                    if (i == 0) {
-                        targetX = pX;
-                        targetY = pY;
-                    } else if (i == 1) {
-                        float lookAhead = 4 * 40.0f;
-                        targetX = pX + lastPlayerDx * lookAhead;
-                        targetY = pY + lastPlayerDy * lookAhead;
-                    } else {
-                        float distToPlayerSq = (pX - centerX) * (pX - centerX) + (pY - centerY) * (pY - centerY);
-                        if (distToPlayerSq > (300.0f * 300.0f)) {
-                            targetX = centerX + (float)GetRandomValue(-300, 300);
-                            targetY = centerY + (float)GetRandomValue(-300, 300);
-                        } else {
-                            targetX = pX;
-                            targetY = pY;
-                        }
-                    }
-
-                    float bestDx = validDirs[0].first;
-                    float bestDy = validDirs[0].second;
-                    float bestDistSq = 1e9f;
-
-                    bool wander = (GetRandomValue(0, 100) < 6);
-                    if (wander) {
-                        int rIdx = GetRandomValue(0, (int)validDirs.size() - 1);
-                        bestDx = validDirs[rIdx].first;
-                        bestDy = validDirs[rIdx].second;
-                    } else {
-                        bool allPenalized = true;
-                        for (auto& vd : validDirs) {
-                            float nextX = centerX + vd.first * 40.0f;
-                            float nextY = centerY + vd.second * 40.0f;
-                            
-                            float penalty = 0.0f;
-                            for (int j = 0; j < 3; ++j) {
-                                if (j == i) continue;
-                                float ghostDistSq = (ghosts[j].x - nextX) * (ghosts[j].x - nextX)
-                                                   + (ghosts[j].y - nextY) * (ghosts[j].y - nextY);
-                                if (ghostDistSq < (30.0f * 30.0f)) {
-                                    penalty = 100000.0f;
-                                }
-                            }
-                            if (penalty == 0.0f) allPenalized = false;
-
-                            float dSq = (targetX - nextX) * (targetX - nextX) + (targetY - nextY) * (targetY - nextY);
-                            dSq += penalty;
-                            if (dSq < bestDistSq) {
-                                bestDistSq = dSq;
-                                bestDx = vd.first;
-                                bestDy = vd.second;
-                            }
-                        }
-
-                        if (allPenalized) {
-                            bestDistSq = 1e9f;
-                            for (auto& vd : validDirs) {
-                                float nextX = centerX + vd.first * 40.0f;
-                                float nextY = centerY + vd.second * 40.0f;
-                                float dSq = (targetX - nextX) * (targetX - nextX) + (targetY - nextY) * (targetY - nextY);
-                                if (dSq < bestDistSq) {
-                                    bestDistSq = dSq;
-                                    bestDx = vd.first;
-                                    bestDy = vd.second;
-                                }
-                            }
-                        }
-                    }
-
-                    ghosts[i].dx = bestDx * ghostSpd;
-                    ghosts[i].dy = bestDy * ghostSpd;
-                }
-            }
-
-            ghosts[i].x += ghosts[i].dx;
-            ghosts[i].y += ghosts[i].dy;
-
-            float distSq = (pX - ghosts[i].x) * (pX - ghosts[i].x) + (pY - ghosts[i].y) * (pY - ghosts[i].y);
-            if (distSq < 576.0f) {
-                PlaySound(ghostSnd);
-                shakeTime = 0.4f;
-                shakeIntensity = 6.0f;
-                flashTime = 0.3f;
-                lives--;
-                if (lives <= 0) {
-                    UpdateHighScores(score);
-                    state = GAMEOVER;
-                } else {
-                    pX = 1 * 40.0f + 20.0f;
-                    pY = 1 * 40.0f + 20.0f;
-                    lastPlayerDx = 0.0f;
-                    lastPlayerDy = 0.0f;
-                    ghosts[0].x = 18 * 40.0f + 20.0f;
-                    ghosts[0].y = 3 * 40.0f + 20.0f;
-                    ghosts[0].dx = 0.0f;
-                    ghosts[0].dy = 0.0f;
-
-                    ghosts[1].x = 3 * 40.0f + 20.0f;
-                    ghosts[1].y = 13 * 40.0f + 20.0f;
-                    ghosts[1].dx = 0.0f;
-                    ghosts[1].dy = 0.0f;
-
-                    ghosts[2].x = 17 * 40.0f + 20.0f;
-                    ghosts[2].y = 13 * 40.0f + 20.0f;
-                    ghosts[2].dx = 0.0f;
-                    ghosts[2].dy = 0.0f;
-
-                    for (int b = 0; b < 3; ++b) bombs[b].active = false;
-                }
-                break;
-            }
-        }
+        UpdateBallPickup();
+        UpdateExitGate();
+        UpdateGhosts();
     }
 }
 
 void UpdateGame() {
-    if (IsKeyPressed(KEY_F11)) {
-        ToggleFullscreen();
-    }
-
     UpdateMenuScreens();
     UpdateGameEndStates();
     UpdatePlayerMovementAndBombs();
@@ -958,17 +996,15 @@ void DrawGame() {
         DrawText("START GAME", 380, 250, menuIdx == 0 ? 28 : 24, menuIdx == 0 ? YELLOW : WHITE);
         DrawText(TextFormat("SELECT LEVEL: < %d >", startLvl), 380, 300, menuIdx == 1 ? 28 : 24, menuIdx == 1 ? YELLOW : WHITE);
         DrawText("HIGHSCORES", 380, 350, menuIdx == 2 ? 28 : 24, menuIdx == 2 ? YELLOW : WHITE);
-        DrawText("FULLSCREEN", 380, 400, menuIdx == 3 ? 28 : 24, menuIdx == 3 ? YELLOW : WHITE);
-        DrawText("EXIT", 380, 450, menuIdx == 4 ? 28 : 24, menuIdx == 4 ? YELLOW : WHITE);
+        DrawText("EXIT", 380, 400, menuIdx == 3 ? 28 : 24, menuIdx == 3 ? YELLOW : WHITE);
 
         if (menuIdx == 0) DrawPokeBall(340.0f, 265.0f, 10.0f);
         else if (menuIdx == 1) DrawPokeBall(340.0f, 315.0f, 10.0f);
         else if (menuIdx == 2) DrawPokeBall(340.0f, 365.0f, 10.0f);
         else if (menuIdx == 3) DrawPokeBall(340.0f, 415.0f, 10.0f);
-        else if (menuIdx == 4) DrawPokeBall(340.0f, 465.0f, 10.0f);
 
         if (((int)(GetTime() * 2) % 2) == 0) {
-            DrawText("Press ENTER to Choose", 370, 500, 22, LIGHTGRAY);
+            DrawText("Press ENTER to Choose", 370, 450, 22, LIGHTGRAY);
         }
     } else if (state == HIGHSCORES) {
         DrawRectangle(0, 0, 1000, 600, Color{10, 10, 18, 255});
