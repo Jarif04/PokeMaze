@@ -204,7 +204,7 @@ void DrawPlayer(float x, float y, float r) {
 
     DrawRectangle((int)(x - r * 0.3f), (int)(y + r * 0.2f + bob), (int)(r * 0.6f), (int)(r * 0.5f), BLUE);
     DrawCircle(x, y - r * 0.3f + bob, r * 0.45f, Color{ 253, 218, 181, 255 });
-    
+
     DrawCircleSector(Vector2{x, y - r * 0.35f + bob}, r * 0.5f, 90.0f, 270.0f, 16, RED);
     DrawRectangle((int)(x - r * 0.75f), (int)(y - r * 0.45f + bob), (int)(r * 0.4f), (int)(r * 0.15f), RED);
     DrawCircle(x + r * 0.15f, y - r * 0.35f + bob, r * 0.07f, BLACK);
@@ -350,7 +350,6 @@ void InitGame() {
     LoadLevel(startLvl);
 }
 
-// Menu navigation + background music for the START and HIGHSCORES screens.
 void UpdateMenuScreens() {
     if (state == START) {
         if (!IsSoundPlaying(bgm)) {
@@ -371,7 +370,7 @@ void UpdateMenuScreens() {
         if (IsKeyPressed(KEY_DOWN)) {
             menuIdx = (menuIdx + 1) % 4;
         }
-        
+
         Rectangle startBtn  = { 380, 245, 240, 35 };
         Rectangle leftArr   = { 340, 305, 30, 35 };
         Rectangle levelBtn  = { 380, 305, 260, 35 };
@@ -387,7 +386,7 @@ void UpdateMenuScreens() {
         static Vector2 lastMousePos = { 0 };
         bool mouseMoved = (mouse.x != lastMousePos.x || mouse.y != lastMousePos.y);
         lastMousePos = mouse;
-        
+
         if (mouseMoved) {
             if (CheckCollisionPointRec(mouse, startBtn)) {
                 menuIdx = 0;
@@ -401,23 +400,23 @@ void UpdateMenuScreens() {
         }
 
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            if (CheckCollisionPointRec(mouse, startBtn)) { 
-                InitGame(); 
-                state = PLAYING; 
-            } else if (CheckCollisionPointRec(mouse, leftArr)) { 
-                startLvl = (startLvl - 2 + 4) % 4 + 1; 
-                menuIdx = 1; 
-            } else if (CheckCollisionPointRec(mouse, rightArr)) { 
-                startLvl = (startLvl % 4) + 1; 
-                menuIdx = 1; 
-            } else if (CheckCollisionPointRec(mouse, levelBtn)) { 
-                menuIdx = 1; 
-            } else if (CheckCollisionPointRec(mouse, hsBtn)) { 
-                state = HIGHSCORES; 
-                menuIdx = 2; 
-            } else if (CheckCollisionPointRec(mouse, exitBtn)) { 
-                shouldExit = true; 
-                menuIdx = 3; 
+            if (CheckCollisionPointRec(mouse, startBtn)) {
+                InitGame();
+                state = PLAYING;
+            } else if (CheckCollisionPointRec(mouse, leftArr)) {
+                startLvl = (startLvl - 2 + 4) % 4 + 1;
+                menuIdx = 1;
+            } else if (CheckCollisionPointRec(mouse, rightArr)) {
+                startLvl = (startLvl % 4) + 1;
+                menuIdx = 1;
+            } else if (CheckCollisionPointRec(mouse, levelBtn)) {
+                menuIdx = 1;
+            } else if (CheckCollisionPointRec(mouse, hsBtn)) {
+                state = HIGHSCORES;
+                menuIdx = 2;
+            } else if (CheckCollisionPointRec(mouse, exitBtn)) {
+                shouldExit = true;
+                menuIdx = 3;
             }
         }
 
@@ -456,7 +455,6 @@ void UpdateMenuScreens() {
     }
 }
 
-// LEVELUP transition timer, GAMEOVER sound/restart handling, and VICTORY input.
 void UpdateGameEndStates() {
     if (state == LEVELUP) {
         if (IsKeyPressed(KEY_ESCAPE)) {
@@ -503,8 +501,6 @@ void UpdateGameEndStates() {
     }
 }
 
-// Player input, movement, and bomb spawn/tick/explosion logic for the PLAYING state.
-// Handles the pause/quit shortcut and keeps the background music looping.
 void UpdatePlayerControlsAndAudio() {
     if (IsKeyPressed(KEY_ESCAPE)) {
         UpdateHighScores(score);
@@ -516,7 +512,6 @@ void UpdatePlayerControlsAndAudio() {
     }
 }
 
-// Counts down the screen-shake/flash effect timers and advances particles.
 void UpdateParticleEffects() {
     if (shakeTime > 0.0f) {
         shakeTime -= GetFrameTime();
@@ -534,8 +529,6 @@ void UpdateParticleEffects() {
     }
 }
 
-// Reads movement keys, applies collision-checked movement, and updates the
-// player's current grid cell (pCol/pRow) plus the shared playerMoved flag.
 void UpdatePlayerMovement() {
     float spd = 3.5f * pSpdBooster;
     float dx = 0.0f;
@@ -571,8 +564,6 @@ void UpdatePlayerMovement() {
     pRow = (int)(pY / 40.0f);
 }
 
-// While the player is moving, counts down the bomb spawn timer and, once it
-// elapses, tries to place up to 3 new bombs near the player.
 void UpdateBombSpawning() {
     if (!playerMoved) return;
 
@@ -623,8 +614,6 @@ void UpdateBombSpawning() {
     }
 }
 
-// Resets the player and ghosts back to their starting spots after a hit,
-// clearing any live bombs so the player gets a clean moment to recover.
 void RespawnPlayerAndGhosts() {
     pX = 1 * 40.0f + 20.0f;
     pY = 1 * 40.0f + 20.0f;
@@ -645,9 +634,6 @@ void RespawnPlayerAndGhosts() {
     for (int b = 0; b < 3; ++b) bombs[b].active = false;
 }
 
-// Ticks each active bomb's fuse: auto-explodes it with a small particle burst
-// when the timer runs out, or explodes it early (with damage) if the player
-// gets too close.
 void UpdateActiveBombs() {
     for (int i = 0; i < 3; ++i) {
         if (!bombs[i].active) continue;
@@ -714,8 +700,6 @@ void UpdatePlayerMovementAndBombs() {
     }
 }
 
-// Collects the ball under the player's current cell, if any, awarding score,
-// spawning a small particle burst, and occasionally boosting player speed.
 void UpdateBallPickup() {
     if (pRow < 0 || pRow >= 15 || pCol < 0 || pCol >= 20) return;
     if (!balls[pRow][pCol]) return;
@@ -745,8 +729,6 @@ void UpdateBallPickup() {
     }
 }
 
-// Unlocks the exit once all balls are collected, and advances to LEVELUP
-// once the player steps onto the exit cell.
 void UpdateExitGate() {
     if (totalBalls <= 0) {
         exitUnlocked = true;
@@ -758,11 +740,7 @@ void UpdateExitGate() {
     }
 }
 
-// Picks a new direction for ghost i once it reaches the center of its
-// current cell: gathers the walkable directions (preferring not to reverse),
-// then chases/ambushes/wanders depending on which ghost this is, while
-// avoiding directions that would collide with another ghost.
-void ChooseGhostDirection(int i, int gRow, int gCol, float centerX, float centerY) {
+std::vector<std::pair<float, float>> GetValidGhostDirections(int i, int gRow, int gCol) {
     float dirs[4][2] = { {0, -1}, {0, 1}, {-1, 0}, {1, 0} };
     std::vector<std::pair<float, float>> validDirs;
 
@@ -790,11 +768,10 @@ void ChooseGhostDirection(int i, int gRow, int gCol, float centerX, float center
         }
     }
 
-    if (validDirs.empty()) return;
+    return validDirs;
+}
 
-    float targetX = pX;
-    float targetY = pY;
-
+void ComputeGhostTargetPosition(int i, float centerX, float centerY, float &targetX, float &targetY) {
     if (i == 0) {
         targetX = pX;
         targetY = pY;
@@ -812,63 +789,80 @@ void ChooseGhostDirection(int i, int gRow, int gCol, float centerX, float center
             targetY = pY;
         }
     }
+}
 
+std::pair<float, float> PickDirectionTowardTarget(int i, float centerX, float centerY, float targetX, float targetY,
+                                                   const std::vector<std::pair<float, float>>& validDirs) {
     float bestDx = validDirs[0].first;
     float bestDy = validDirs[0].second;
     float bestDistSq = 1e9f;
+    bool allPenalized = true;
 
-    bool wander = (GetRandomValue(0, 100) < 6);
-    if (wander) {
-        int rIdx = GetRandomValue(0, (int)validDirs.size() - 1);
-        bestDx = validDirs[rIdx].first;
-        bestDy = validDirs[rIdx].second;
-    } else {
-        bool allPenalized = true;
+    for (auto& vd : validDirs) {
+        float nextX = centerX + vd.first * 40.0f;
+        float nextY = centerY + vd.second * 40.0f;
+
+        float penalty = 0.0f;
+        for (int j = 0; j < 3; ++j) {
+            if (j == i) continue;
+            float ghostDistSq = (ghosts[j].x - nextX) * (ghosts[j].x - nextX)
+                               + (ghosts[j].y - nextY) * (ghosts[j].y - nextY);
+            if (ghostDistSq < (30.0f * 30.0f)) {
+                penalty = 100000.0f;
+            }
+        }
+        if (penalty == 0.0f) allPenalized = false;
+
+        float dSq = (targetX - nextX) * (targetX - nextX) + (targetY - nextY) * (targetY - nextY);
+        dSq += penalty;
+        if (dSq < bestDistSq) {
+            bestDistSq = dSq;
+            bestDx = vd.first;
+            bestDy = vd.second;
+        }
+    }
+
+    if (allPenalized) {
+        bestDistSq = 1e9f;
         for (auto& vd : validDirs) {
             float nextX = centerX + vd.first * 40.0f;
             float nextY = centerY + vd.second * 40.0f;
-
-            float penalty = 0.0f;
-            for (int j = 0; j < 3; ++j) {
-                if (j == i) continue;
-                float ghostDistSq = (ghosts[j].x - nextX) * (ghosts[j].x - nextX)
-                                   + (ghosts[j].y - nextY) * (ghosts[j].y - nextY);
-                if (ghostDistSq < (30.0f * 30.0f)) {
-                    penalty = 100000.0f;
-                }
-            }
-            if (penalty == 0.0f) allPenalized = false;
-
             float dSq = (targetX - nextX) * (targetX - nextX) + (targetY - nextY) * (targetY - nextY);
-            dSq += penalty;
             if (dSq < bestDistSq) {
                 bestDistSq = dSq;
                 bestDx = vd.first;
                 bestDy = vd.second;
             }
         }
+    }
 
-        if (allPenalized) {
-            bestDistSq = 1e9f;
-            for (auto& vd : validDirs) {
-                float nextX = centerX + vd.first * 40.0f;
-                float nextY = centerY + vd.second * 40.0f;
-                float dSq = (targetX - nextX) * (targetX - nextX) + (targetY - nextY) * (targetY - nextY);
-                if (dSq < bestDistSq) {
-                    bestDistSq = dSq;
-                    bestDx = vd.first;
-                    bestDy = vd.second;
-                }
-            }
-        }
+    return { bestDx, bestDy };
+}
+
+void ChooseGhostDirection(int i, int gRow, int gCol, float centerX, float centerY) {
+    std::vector<std::pair<float, float>> validDirs = GetValidGhostDirections(i, gRow, gCol);
+    if (validDirs.empty()) return;
+
+    float targetX = pX;
+    float targetY = pY;
+    ComputeGhostTargetPosition(i, centerX, centerY, targetX, targetY);
+
+    float bestDx, bestDy;
+    bool wander = (GetRandomValue(0, 100) < 6);
+    if (wander) {
+        int rIdx = GetRandomValue(0, (int)validDirs.size() - 1);
+        bestDx = validDirs[rIdx].first;
+        bestDy = validDirs[rIdx].second;
+    } else {
+        std::pair<float, float> best = PickDirectionTowardTarget(i, centerX, centerY, targetX, targetY, validDirs);
+        bestDx = best.first;
+        bestDy = best.second;
     }
 
     ghosts[i].dx = bestDx * ghostSpd;
     ghosts[i].dy = bestDy * ghostSpd;
 }
 
-// Snaps ghost i to its cell center and re-picks a direction whenever it
-// reaches (or passes) that center point.
 void UpdateGhostDirectionIfAtCenter(int i) {
     int gCol = (int)(ghosts[i].x / 40.0f);
     int gRow = (int)(ghosts[i].y / 40.0f);
@@ -889,10 +883,6 @@ void UpdateGhostDirectionIfAtCenter(int i) {
     ChooseGhostDirection(i, gRow, gCol, centerX, centerY);
 }
 
-// Checks whether ghost i is touching the player; if so, applies the hit
-// (life loss, screen shake/flash, and either game over or a respawn).
-// Returns true when a hit was handled, so the caller can stop processing
-// further ghosts for this frame.
 bool CheckGhostPlayerCollision(int i) {
     float distSq = (pX - ghosts[i].x) * (pX - ghosts[i].x) + (pY - ghosts[i].y) * (pY - ghosts[i].y);
     if (distSq >= 576.0f) return false;
@@ -911,9 +901,6 @@ bool CheckGhostPlayerCollision(int i) {
     return true;
 }
 
-// Advances all 3 ghosts for one frame: re-aims them at cell centers, moves
-// them, and checks for a collision with the player (stopping at the first
-// one found, matching the original single-hit-per-frame behavior).
 void UpdateGhosts() {
     for (int i = 0; i < 3; ++i) {
         UpdateGhostDirectionIfAtCenter(i);
@@ -949,253 +936,276 @@ void DrawBackgroundPokeBall(float x, float y, float r) {
     DrawCircleLines(x, y, r * 0.3f, Color{0, 0, 0, 40});
 }
 
+void DrawStartScreen() {
+    DrawRectangle(0, 0, 1000, 600, Color{10, 10, 18, 255});
+    DrawRectangle(0, 300, 1000, 300, Color{20, 15, 30, 255});
+
+    for (int i = 0; i < 50; ++i) {
+        DrawCircle((int)stars[i].x, (int)stars[i].y, stars[i].size, ColorAlpha(WHITE, 0.4f));
+    }
+
+    DrawLineEx(Vector2{ 0.0f, 300.0f }, Vector2{ 1000.0f, 300.0f }, 3.0f, SKYBLUE);
+    DrawLineEx(Vector2{ 0.0f, 300.0f }, Vector2{ 1000.0f, 300.0f }, 8.0f, ColorAlpha(SKYBLUE, 0.3f));
+
+    for (int i = 0; i <= 20; ++i) {
+        float px = i * 50.0f;
+        DrawLineEx(Vector2{ 500.0f, 300.0f }, Vector2{ px, 600.0f }, 1.5f, PURPLE);
+    }
+
+    float scroll = fmodf((float)GetTime() * 40.0f, 30.0f);
+    for (float h = 0.0f; h < 300.0f; h += 30.0f) {
+        float y = 300.0f + h + scroll;
+        if (y < 600.0f) {
+            float pct = (y - 300.0f) / 300.0f;
+            DrawLineEx(Vector2{ 500.0f - pct * 500.0f, y }, Vector2{ 500.0f + pct * 500.0f, y }, 1.0f + pct * 2.0f, ColorAlpha(PURPLE, pct * 0.7f));
+        }
+    }
+
+    DrawBackgroundPokeBall(500.0f, 300.0f, 180.0f);
+
+    float pBounce = sinf((float)GetTime() * 4.0f) * 10.0f;
+    DrawPlayer(200.0f, 380.0f + pBounce, 40.0f);
+
+    float gFloat = cosf((float)GetTime() * 3.0f) * 15.0f;
+    DrawGhost(800.0f, 300.0f + gFloat, 40.0f, 0);
+
+    float pulseSize = 44.0f + 6.0f * sinf((float)GetTime() * 3.0f);
+    int titleWidth = MeasureText("POKÉ-MAZE ADVENTURE", (int)pulseSize);
+    int titleX = 500 - titleWidth / 2;
+    DrawText("POKÉ-MAZE ADVENTURE", titleX - 3, 82, (int)pulseSize, MAGENTA);
+    DrawText("POKÉ-MAZE ADVENTURE", titleX + 3, 82, (int)pulseSize, SKYBLUE);
+    DrawText("POKÉ-MAZE ADVENTURE", titleX, 80, (int)pulseSize, YELLOW);
+
+    DrawText("START GAME", 380, 250, menuIdx == 0 ? 28 : 24, menuIdx == 0 ? YELLOW : WHITE);
+    DrawText(TextFormat("SELECT LEVEL: < %d >", startLvl), 380, 300, menuIdx == 1 ? 28 : 24, menuIdx == 1 ? YELLOW : WHITE);
+    DrawText("HIGHSCORES", 380, 350, menuIdx == 2 ? 28 : 24, menuIdx == 2 ? YELLOW : WHITE);
+    DrawText("EXIT", 380, 400, menuIdx == 3 ? 28 : 24, menuIdx == 3 ? YELLOW : WHITE);
+
+    if (menuIdx == 0) DrawPokeBall(340.0f, 265.0f, 10.0f);
+    else if (menuIdx == 1) DrawPokeBall(340.0f, 315.0f, 10.0f);
+    else if (menuIdx == 2) DrawPokeBall(340.0f, 365.0f, 10.0f);
+    else if (menuIdx == 3) DrawPokeBall(340.0f, 415.0f, 10.0f);
+
+    if (((int)(GetTime() * 2) % 2) == 0) {
+        DrawText("Press ENTER to Choose", 370, 450, 22, LIGHTGRAY);
+    }
+}
+
+void DrawHighScoresScreen() {
+    DrawRectangle(0, 0, 1000, 600, Color{10, 10, 18, 255});
+    DrawRectangle(0, 300, 1000, 300, Color{20, 15, 30, 255});
+
+    for (int i = 0; i < 50; ++i) {
+        DrawCircle((int)stars[i].x, (int)stars[i].y, stars[i].size, ColorAlpha(WHITE, 0.4f));
+    }
+
+    int boxWidth = 400;
+    int boxHeight = 280;
+    int boxX = 500 - boxWidth / 2;
+    int boxY = 180;
+
+    DrawRectangleRounded(Rectangle{(float)boxX, (float)boxY, (float)boxWidth, (float)boxHeight}, 0.05f, 4, Color{25, 25, 35, 255});
+    DrawRectangleRoundedLines(Rectangle{(float)boxX, (float)boxY, (float)boxWidth, (float)boxHeight}, 0.05f, 4, 3.0f, GOLD);
+
+    int titleW = MeasureText("TOP 5 HIGH SCORES", 24);
+    DrawText("TOP 5 HIGH SCORES", 500 - titleW / 2, 210, 24, GOLD);
+
+    for (int i = 0; i < 5; ++i) {
+        DrawText(TextFormat("%d. %05d", i + 1, highScores[i]), boxX + 120, 260 + i * 32, 22, WHITE);
+    }
+
+    if (((int)(GetTime() * 2) % 2) == 0) {
+        DrawText("Press ESC / ENTER or CLICK to Go Back", 270, 490, 22, LIGHTGRAY);
+    }
+}
+
+void DrawGameOverScreen() {
+    ClearBackground(Color{40, 10, 10, 255});
+    DrawText("GAME OVER", 320, 70, 60, RED);
+    DrawText("Caught by Wild Ghosts!", 320, 140, 28, WHITE);
+    DrawText(TextFormat("FINAL SCORE: %d", score), 390, 190, 24, LIGHTGRAY);
+    DrawText("TOP 5 SCORES", 390, 235, 20, GOLD);
+    for (int i = 0; i < 5; ++i) {
+        Color color = (score == highScores[i]) ? LIME : LIGHTGRAY;
+        DrawText(TextFormat("%d. %05d", i + 1, highScores[i]), 390, 265 + i * 22, 18, color);
+    }
+    DrawText("Press 'R' to Try Again", 340, 440, 24, YELLOW);
+    DrawText("Press ESC for Menu", 360, 480, 20, LIGHTGRAY);
+}
+
+void DrawVictoryScreen() {
+    ClearBackground(Color{10, 40, 30, 255});
+
+    DrawCircleGradient(500, 180, 160.0f, Color{ 255, 223, 0, 40 }, Color{ 0, 0, 0, 0 });
+
+    float vPulse = 54.0f + 8.0f * sinf((float)GetTime() * 4.0f);
+    int vWidth = MeasureText("YOU WON!", (int)vPulse);
+    DrawText("YOU WON!", 500 - vWidth/2 - 3, 132, (int)vPulse, Color{ 0, 100, 80, 255 });
+    DrawText("YOU WON!", 500 - vWidth/2 + 3, 132, (int)vPulse, GOLD);
+    DrawText("YOU WON!", 500 - vWidth/2, 130, (int)vPulse, YELLOW);
+
+    const char* sub = "All 4 mazes cleared - the wild ghosts retreat!";
+    DrawText(sub, 500 - MeasureText(sub, 24)/2, 230, 24, LIGHTGRAY);
+
+    if (isNewHighScore) {
+        DrawText("NEW HIGH SCORE!", 500 - MeasureText("NEW HIGH SCORE!", 26)/2, 290, 26, GOLD);
+        DrawText(TextFormat("FINAL SCORE: %d", score), 500 - MeasureText(TextFormat("FINAL SCORE: %d", score), 24)/2, 330, 24, LIME);
+    } else {
+        DrawText(TextFormat("FINAL SCORE: %d", score), 500 - MeasureText(TextFormat("FINAL SCORE: %d", score), 24)/2, 290, 24, WHITE);
+        DrawText(TextFormat("HIGH SCORE: %d", highScores[0]), 500 - MeasureText(TextFormat("HIGH SCORE: %d", highScores[0]), 24)/2, 330, 24, LIGHTGRAY);
+    }
+
+    for (int i = 0; i < 5; ++i) {
+        float bob = sinf((float)GetTime() * 5.0f + i * 1.0f) * 8.0f;
+        DrawPokeBall(360.0f + i * 70.0f, 400.0f + bob, 15.0f);
+    }
+
+    DrawPlayer(500.0f, 490.0f, 25.0f);
+
+    if (((int)(GetTime() * 2) % 2) == 0) {
+        const char* prompt = "Press ENTER or ESC to return to menu";
+        DrawText(prompt, 500 - MeasureText(prompt, 20)/2, 540, 20, LIGHTGRAY);
+    }
+}
+
+void DrawMazeAndEntities() {
+    if (shakeTime > 0.0f) {
+        camera.offset.x = (float)GetRandomValue(-shakeIntensity, shakeIntensity);
+        camera.offset.y = (float)GetRandomValue(-shakeIntensity, shakeIntensity);
+    } else {
+        camera.offset.x = 0.0f;
+        camera.offset.y = 0.0f;
+    }
+
+    BeginMode2D(camera);
+
+    for (int r = 0; r < 15; ++r) {
+        for (int c = 0; c < 20; ++c) {
+            float x = c * 40.0f;
+            float y = r * 40.0f;
+
+            if (currentMap[r][c] == 1) {
+                DrawRectangle((int)x, (int)y, 40, 40, Color{40, 50, 75, 255});
+                Color neonColor = (currentLevel % 2 == 1) ? SKYBLUE : PURPLE;
+
+                if (c == 0 || currentMap[r][c - 1] != 1) {
+                    DrawLineEx(Vector2{x, y}, Vector2{x, y + 40.0f}, 2.0f, neonColor);
+                }
+                if (c == 19 || currentMap[r][c + 1] != 1) {
+                    DrawLineEx(Vector2{x + 40.0f, y}, Vector2{x + 40.0f, y + 40.0f}, 2.0f, neonColor);
+                }
+                if (r == 0 || currentMap[r - 1][c] != 1) {
+                    DrawLineEx(Vector2{x, y}, Vector2{x + 40.0f, y}, 2.0f, neonColor);
+                }
+                if (r == 14 || currentMap[r + 1][c] != 1) {
+                    DrawLineEx(Vector2{x, y + 40.0f}, Vector2{x + 40.0f, y + 40.0f}, 2.0f, neonColor);
+                }
+            } else {
+                DrawRectangle((int)x, (int)y, 40, 40, Color{15, 15, 22, 255});
+
+                if (balls[r][c]) {
+                    float pulse = 1.0f + 0.15f * sinf((float)GetTime() * 8.0f);
+                    DrawPoly(Vector2{x + 20.0f, y + 20.0f}, 4, 6.0f * pulse, (float)GetTime() * 100.0f, GOLD);
+                    DrawPoly(Vector2{x + 20.0f, y + 20.0f}, 4, 6.0f * pulse * 0.5f, (float)GetTime() * 100.0f, WHITE);
+                }
+            }
+        }
+    }
+
+    if (exitRow >= 0 && exitCol >= 0) {
+        float ex = exitCol * 40.0f;
+        float ey = exitRow * 40.0f;
+        if (!exitUnlocked) {
+            DrawRectangle((int)ex, (int)ey, 40, 40, ColorAlpha(RED, 0.3f));
+            DrawRectangleLinesEx(Rectangle{ex, ey, 40.0f, 40.0f}, 3.0f, RED);
+            DrawLine((int)ex, (int)ey, (int)(ex + 40), (int)(ey + 40), RED);
+            DrawLine((int)(ex + 40), (int)ey, (int)ex, (int)(ey + 40), RED);
+        } else {
+            Color gateColor = (((int)(GetTime() * 4) % 2) == 0) ? LIME : GREEN;
+            DrawRectangle((int)ex + 8, (int)ey + 8, 24, 24, ColorAlpha(gateColor, 0.4f));
+            DrawRectangleLinesEx(Rectangle{ex, ey, 40.0f, 40.0f}, 3.0f, gateColor);
+        }
+    }
+
+    for (int i = 0; i < 128; ++i) {
+        if (particles[i].life > 0.0f) {
+            float pct = particles[i].life / particles[i].maxLife;
+            DrawCircle((int)particles[i].x, (int)particles[i].y, 4.0f * pct, ColorAlpha(particles[i].color, pct));
+        }
+    }
+
+    for (int i = 0; i < 3; ++i) {
+        if (bombs[i].active) {
+            float bx = bombs[i].col * 40.0f + 20.0f;
+            float by = bombs[i].row * 40.0f + 20.0f;
+            DrawBomb(bx, by, 12.0f, bombs[i].timeLeft);
+        }
+    }
+
+    DrawPlayer(pX, pY, 12.0f);
+
+    for (int i = 0; i < 3; ++i) {
+        DrawGhost(ghosts[i].x, ghosts[i].y, 12.0f, i);
+    }
+
+    BeginBlendMode(BLEND_ADDITIVE);
+    DrawCircleGradient((int)pX, (int)pY, 180.0f, Color{ 255, 255, 200, 45 }, Color{ 0, 0, 0, 0 });
+    EndBlendMode();
+
+    EndMode2D();
+}
+
+void DrawSidebarHUD() {
+    DrawRectangle(800, 0, 200, 600, Color{15, 15, 22, 255});
+    DrawRectangle(800, 0, 5, 600, DARKGRAY);
+
+    DrawRectangleRounded(Rectangle{ 820.0f, 25.0f, 170.0f, 550.0f }, 0.05f, 4, Color{ 0, 0, 0, 100 });
+    DrawRectangleRounded(Rectangle{ 815.0f, 20.0f, 170.0f, 550.0f }, 0.05f, 4, Color{ 25, 25, 35, 255 });
+    DrawRectangleRoundedLines(Rectangle{ 815.0f, 20.0f, 170.0f, 550.0f }, 0.05f, 4, 2.0f, Color{ 60, 70, 90, 255 });
+
+    DrawText("POKÉ-MAZE", 830, 50, 22, GOLD);
+
+    DrawText("LEVEL", 830, 110, 12, LIGHTGRAY);
+    DrawText(TextFormat("%d / 4", currentLevel), 830, 130, 24, WHITE);
+
+    DrawText("SCORE", 830, 180, 12, LIGHTGRAY);
+    DrawText(TextFormat("%05d", score), 830, 200, 24, LIME);
+
+    DrawText("BOOSTER SPEED", 830, 250, 12, LIGHTGRAY);
+    DrawText(TextFormat("%.1fx", pSpdBooster), 830, 270, 24, WHITE);
+
+    DrawText("LIVES", 830, 320, 12, LIGHTGRAY);
+    for (int i = 0; i < lives; ++i) {
+        float bounce = sinf((float)GetTime() * 5.0f + i) * 3.0f;
+        DrawPokeBall(840.0f + i * 35.0f, 360.0f + bounce, 10.0f);
+    }
+
+    if (state == LEVELUP) {
+        DrawRectangle(0, 200, 1000, 200, ColorAlpha(BLACK, 0.8f));
+        DrawText("LEVEL UP!", 360, 240, 50, GOLD);
+        DrawText("Get ready for the next challenge...", 310, 310, 20, WHITE);
+    }
+
+    if (flashTime > 0.0f) {
+        DrawRectangle(0, 0, 1000, 600, ColorAlpha(RED, (flashTime / 0.3f) * 0.4f));
+    }
+}
+
 void DrawGame() {
     BeginTextureMode(screenTarget);
     ClearBackground(BLACK);
 
     if (state == START) {
-        DrawRectangle(0, 0, 1000, 600, Color{10, 10, 18, 255});
-        DrawRectangle(0, 300, 1000, 300, Color{20, 15, 30, 255});
-
-        for (int i = 0; i < 50; ++i) {
-            DrawCircle((int)stars[i].x, (int)stars[i].y, stars[i].size, ColorAlpha(WHITE, 0.4f));
-        }
-
-        DrawLineEx(Vector2{ 0.0f, 300.0f }, Vector2{ 1000.0f, 300.0f }, 3.0f, SKYBLUE);
-        DrawLineEx(Vector2{ 0.0f, 300.0f }, Vector2{ 1000.0f, 300.0f }, 8.0f, ColorAlpha(SKYBLUE, 0.3f));
-
-        for (int i = 0; i <= 20; ++i) {
-            float px = i * 50.0f;
-            DrawLineEx(Vector2{ 500.0f, 300.0f }, Vector2{ px, 600.0f }, 1.5f, PURPLE);
-        }
-
-        float scroll = fmodf((float)GetTime() * 40.0f, 30.0f);
-        for (float h = 0.0f; h < 300.0f; h += 30.0f) {
-            float y = 300.0f + h + scroll;
-            if (y < 600.0f) {
-                float pct = (y - 300.0f) / 300.0f;
-                DrawLineEx(Vector2{ 500.0f - pct * 500.0f, y }, Vector2{ 500.0f + pct * 500.0f, y }, 1.0f + pct * 2.0f, ColorAlpha(PURPLE, pct * 0.7f));
-            }
-        }
-
-        DrawBackgroundPokeBall(500.0f, 300.0f, 180.0f);
-
-        float pBounce = sinf((float)GetTime() * 4.0f) * 10.0f;
-        DrawPlayer(200.0f, 380.0f + pBounce, 40.0f);
-
-        float gFloat = cosf((float)GetTime() * 3.0f) * 15.0f;
-        DrawGhost(800.0f, 300.0f + gFloat, 40.0f, 0);
-
-        float pulseSize = 44.0f + 6.0f * sinf((float)GetTime() * 3.0f);
-        int titleWidth = MeasureText("POKÉ-MAZE ADVENTURE", (int)pulseSize);
-        int titleX = 500 - titleWidth / 2;
-        DrawText("POKÉ-MAZE ADVENTURE", titleX - 3, 82, (int)pulseSize, MAGENTA);
-        DrawText("POKÉ-MAZE ADVENTURE", titleX + 3, 82, (int)pulseSize, SKYBLUE);
-        DrawText("POKÉ-MAZE ADVENTURE", titleX, 80, (int)pulseSize, YELLOW);
-
-        DrawText("START GAME", 380, 250, menuIdx == 0 ? 28 : 24, menuIdx == 0 ? YELLOW : WHITE);
-        DrawText(TextFormat("SELECT LEVEL: < %d >", startLvl), 380, 300, menuIdx == 1 ? 28 : 24, menuIdx == 1 ? YELLOW : WHITE);
-        DrawText("HIGHSCORES", 380, 350, menuIdx == 2 ? 28 : 24, menuIdx == 2 ? YELLOW : WHITE);
-        DrawText("EXIT", 380, 400, menuIdx == 3 ? 28 : 24, menuIdx == 3 ? YELLOW : WHITE);
-
-        if (menuIdx == 0) DrawPokeBall(340.0f, 265.0f, 10.0f);
-        else if (menuIdx == 1) DrawPokeBall(340.0f, 315.0f, 10.0f);
-        else if (menuIdx == 2) DrawPokeBall(340.0f, 365.0f, 10.0f);
-        else if (menuIdx == 3) DrawPokeBall(340.0f, 415.0f, 10.0f);
-
-        if (((int)(GetTime() * 2) % 2) == 0) {
-            DrawText("Press ENTER to Choose", 370, 450, 22, LIGHTGRAY);
-        }
+        DrawStartScreen();
     } else if (state == HIGHSCORES) {
-        DrawRectangle(0, 0, 1000, 600, Color{10, 10, 18, 255});
-        DrawRectangle(0, 300, 1000, 300, Color{20, 15, 30, 255});
-
-        for (int i = 0; i < 50; ++i) {
-            DrawCircle((int)stars[i].x, (int)stars[i].y, stars[i].size, ColorAlpha(WHITE, 0.4f));
-        }
-
-        int boxWidth = 400;
-        int boxHeight = 280;
-        int boxX = 500 - boxWidth / 2;
-        int boxY = 180;
-        
-        DrawRectangleRounded(Rectangle{(float)boxX, (float)boxY, (float)boxWidth, (float)boxHeight}, 0.05f, 4, Color{25, 25, 35, 255});
-        DrawRectangleRoundedLines(Rectangle{(float)boxX, (float)boxY, (float)boxWidth, (float)boxHeight}, 0.05f, 4, 3.0f, GOLD);
-        
-        int titleW = MeasureText("TOP 5 HIGH SCORES", 24);
-        DrawText("TOP 5 HIGH SCORES", 500 - titleW / 2, 210, 24, GOLD);
-
-        for (int i = 0; i < 5; ++i) {
-            DrawText(TextFormat("%d. %05d", i + 1, highScores[i]), boxX + 120, 260 + i * 32, 22, WHITE);
-        }
-
-        if (((int)(GetTime() * 2) % 2) == 0) {
-            DrawText("Press ESC / ENTER or CLICK to Go Back", 270, 490, 22, LIGHTGRAY);
-        }
+        DrawHighScoresScreen();
     } else if (state == GAMEOVER) {
-        ClearBackground(Color{40, 10, 10, 255});
-        DrawText("GAME OVER", 320, 70, 60, RED);
-        DrawText("Caught by Wild Ghosts!", 320, 140, 28, WHITE);
-        DrawText(TextFormat("FINAL SCORE: %d", score), 390, 190, 24, LIGHTGRAY);
-        DrawText("TOP 5 SCORES", 390, 235, 20, GOLD);
-        for (int i = 0; i < 5; ++i) {
-            Color color = (score == highScores[i]) ? LIME : LIGHTGRAY;
-            DrawText(TextFormat("%d. %05d", i + 1, highScores[i]), 390, 265 + i * 22, 18, color);
-        }
-        DrawText("Press 'R' to Try Again", 340, 440, 24, YELLOW);
-        DrawText("Press ESC for Menu", 360, 480, 20, LIGHTGRAY);
+        DrawGameOverScreen();
     } else if (state == VICTORY) {
-        ClearBackground(Color{10, 40, 30, 255});
-        
-        DrawCircleGradient(500, 180, 160.0f, Color{ 255, 223, 0, 40 }, Color{ 0, 0, 0, 0 });
-
-        float vPulse = 54.0f + 8.0f * sinf((float)GetTime() * 4.0f);
-        int vWidth = MeasureText("YOU WON!", (int)vPulse);
-        DrawText("YOU WON!", 500 - vWidth/2 - 3, 132, (int)vPulse, Color{ 0, 100, 80, 255 });
-        DrawText("YOU WON!", 500 - vWidth/2 + 3, 132, (int)vPulse, GOLD);
-        DrawText("YOU WON!", 500 - vWidth/2, 130, (int)vPulse, YELLOW);
-
-        const char* sub = "All 4 mazes cleared - the wild ghosts retreat!";
-        DrawText(sub, 500 - MeasureText(sub, 24)/2, 230, 24, LIGHTGRAY);
-
-        if (isNewHighScore) {
-            DrawText("NEW HIGH SCORE!", 500 - MeasureText("NEW HIGH SCORE!", 26)/2, 290, 26, GOLD);
-            DrawText(TextFormat("FINAL SCORE: %d", score), 500 - MeasureText(TextFormat("FINAL SCORE: %d", score), 24)/2, 330, 24, LIME);
-        } else {
-            DrawText(TextFormat("FINAL SCORE: %d", score), 500 - MeasureText(TextFormat("FINAL SCORE: %d", score), 24)/2, 290, 24, WHITE);
-            DrawText(TextFormat("HIGH SCORE: %d", highScores[0]), 500 - MeasureText(TextFormat("HIGH SCORE: %d", highScores[0]), 24)/2, 330, 24, LIGHTGRAY);
-        }
-
-        for (int i = 0; i < 5; ++i) {
-            float bob = sinf((float)GetTime() * 5.0f + i * 1.0f) * 8.0f;
-            DrawPokeBall(360.0f + i * 70.0f, 400.0f + bob, 15.0f);
-        }
-
-        DrawPlayer(500.0f, 490.0f, 25.0f);
-
-        if (((int)(GetTime() * 2) % 2) == 0) {
-            const char* prompt = "Press ENTER or ESC to return to menu";
-            DrawText(prompt, 500 - MeasureText(prompt, 20)/2, 540, 20, LIGHTGRAY);
-        }
+        DrawVictoryScreen();
     } else if (state == PLAYING || state == LEVELUP) {
-        if (shakeTime > 0.0f) {
-            camera.offset.x = (float)GetRandomValue(-shakeIntensity, shakeIntensity);
-            camera.offset.y = (float)GetRandomValue(-shakeIntensity, shakeIntensity);
-        } else {
-            camera.offset.x = 0.0f;
-            camera.offset.y = 0.0f;
-        }
-
-        BeginMode2D(camera);
-
-        for (int r = 0; r < 15; ++r) {
-            for (int c = 0; c < 20; ++c) {
-                float x = c * 40.0f;
-                float y = r * 40.0f;
-
-                if (currentMap[r][c] == 1) {
-                    DrawRectangle((int)x, (int)y, 40, 40, Color{40, 50, 75, 255});
-                    Color neonColor = (currentLevel % 2 == 1) ? SKYBLUE : PURPLE;
-
-                    if (c == 0 || currentMap[r][c - 1] != 1) {
-                        DrawLineEx(Vector2{x, y}, Vector2{x, y + 40.0f}, 2.0f, neonColor);
-                    }
-                    if (c == 19 || currentMap[r][c + 1] != 1) {
-                        DrawLineEx(Vector2{x + 40.0f, y}, Vector2{x + 40.0f, y + 40.0f}, 2.0f, neonColor);
-                    }
-                    if (r == 0 || currentMap[r - 1][c] != 1) {
-                        DrawLineEx(Vector2{x, y}, Vector2{x + 40.0f, y}, 2.0f, neonColor);
-                    }
-                    if (r == 14 || currentMap[r + 1][c] != 1) {
-                        DrawLineEx(Vector2{x, y + 40.0f}, Vector2{x + 40.0f, y + 40.0f}, 2.0f, neonColor);
-                    }
-                } else {
-                    DrawRectangle((int)x, (int)y, 40, 40, Color{15, 15, 22, 255});
-
-                    if (balls[r][c]) {
-                        float pulse = 1.0f + 0.15f * sinf((float)GetTime() * 8.0f);
-                        DrawPoly(Vector2{x + 20.0f, y + 20.0f}, 4, 6.0f * pulse, (float)GetTime() * 100.0f, GOLD);
-                        DrawPoly(Vector2{x + 20.0f, y + 20.0f}, 4, 6.0f * pulse * 0.5f, (float)GetTime() * 100.0f, WHITE);
-                    }
-                }
-            }
-        }
-
-        if (exitRow >= 0 && exitCol >= 0) {
-            float ex = exitCol * 40.0f;
-            float ey = exitRow * 40.0f;
-            if (!exitUnlocked) {
-                DrawRectangle((int)ex, (int)ey, 40, 40, ColorAlpha(RED, 0.3f));
-                DrawRectangleLinesEx(Rectangle{ex, ey, 40.0f, 40.0f}, 3.0f, RED);
-                DrawLine((int)ex, (int)ey, (int)(ex + 40), (int)(ey + 40), RED);
-                DrawLine((int)(ex + 40), (int)ey, (int)ex, (int)(ey + 40), RED);
-            } else {
-                Color gateColor = (((int)(GetTime() * 4) % 2) == 0) ? LIME : GREEN;
-                DrawRectangle((int)ex + 8, (int)ey + 8, 24, 24, ColorAlpha(gateColor, 0.4f));
-                DrawRectangleLinesEx(Rectangle{ex, ey, 40.0f, 40.0f}, 3.0f, gateColor);
-            }
-        }
-
-        for (int i = 0; i < 128; ++i) {
-            if (particles[i].life > 0.0f) {
-                float pct = particles[i].life / particles[i].maxLife;
-                DrawCircle((int)particles[i].x, (int)particles[i].y, 4.0f * pct, ColorAlpha(particles[i].color, pct));
-            }
-        }
-
-        for (int i = 0; i < 3; ++i) {
-            if (bombs[i].active) {
-                float bx = bombs[i].col * 40.0f + 20.0f;
-                float by = bombs[i].row * 40.0f + 20.0f;
-                DrawBomb(bx, by, 12.0f, bombs[i].timeLeft);
-            }
-        }
-
-        DrawPlayer(pX, pY, 12.0f);
-
-        for (int i = 0; i < 3; ++i) {
-            DrawGhost(ghosts[i].x, ghosts[i].y, 12.0f, i);
-        }
-
-        BeginBlendMode(BLEND_ADDITIVE);
-        DrawCircleGradient((int)pX, (int)pY, 180.0f, Color{ 255, 255, 200, 45 }, Color{ 0, 0, 0, 0 });
-        EndBlendMode();
-
-        EndMode2D();
-
-        DrawRectangle(800, 0, 200, 600, Color{15, 15, 22, 255});
-        DrawRectangle(800, 0, 5, 600, DARKGRAY);
-
-        DrawRectangleRounded(Rectangle{ 820.0f, 25.0f, 170.0f, 550.0f }, 0.05f, 4, Color{ 0, 0, 0, 100 });
-        DrawRectangleRounded(Rectangle{ 815.0f, 20.0f, 170.0f, 550.0f }, 0.05f, 4, Color{ 25, 25, 35, 255 });
-        DrawRectangleRoundedLines(Rectangle{ 815.0f, 20.0f, 170.0f, 550.0f }, 0.05f, 4, 2.0f, Color{ 60, 70, 90, 255 });
-
-        DrawText("POKÉ-MAZE", 830, 50, 22, GOLD);
-
-        DrawText("LEVEL", 830, 110, 12, LIGHTGRAY);
-        DrawText(TextFormat("%d / 4", currentLevel), 830, 130, 24, WHITE);
-
-        DrawText("SCORE", 830, 180, 12, LIGHTGRAY);
-        DrawText(TextFormat("%05d", score), 830, 200, 24, LIME);
-
-        DrawText("BOOSTER SPEED", 830, 250, 12, LIGHTGRAY);
-        DrawText(TextFormat("%.1fx", pSpdBooster), 830, 270, 24, WHITE);
-
-        DrawText("LIVES", 830, 320, 12, LIGHTGRAY);
-        for (int i = 0; i < lives; ++i) {
-            float bounce = sinf((float)GetTime() * 5.0f + i) * 3.0f;
-            DrawPokeBall(840.0f + i * 35.0f, 360.0f + bounce, 10.0f);
-        }
-
-        if (state == LEVELUP) {
-            DrawRectangle(0, 200, 1000, 200, ColorAlpha(BLACK, 0.8f));
-            DrawText("LEVEL UP!", 360, 240, 50, GOLD);
-            DrawText("Get ready for the next challenge...", 310, 310, 20, WHITE);
-        }
-
-        if (flashTime > 0.0f) {
-            DrawRectangle(0, 0, 1000, 600, ColorAlpha(RED, (flashTime / 0.3f) * 0.4f));
-        }
+        DrawMazeAndEntities();
+        DrawSidebarHUD();
     }
 
     EndTextureMode();
